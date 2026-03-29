@@ -1,0 +1,14 @@
+{
+  "name": "ring-timelapse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "snapshot": "node snapshot.mjs",
+    "setup-auth": "node cli/setup-auth.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ring-client-api": "^14.8.0"
+  }
+}
