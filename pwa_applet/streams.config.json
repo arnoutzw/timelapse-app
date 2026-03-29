@@ -1,0 +1,16 @@
+{
+  "ring": {
+    "tokenPath": "./data/ring-token.json"
+  },
+  "streams": [
+    {
+      "id": "kweektent",
+      "name": "Kweektent",
+      "cameraName": "Indoor Cam",
+      "notes": "Ring Indoor Camera — direct API access, no Home Assistant required.",
+      "startupConnect": false,
+      "captureIntervalMs": 15000,
+      "captureMethod": "auto"
+    }
+  ]
+}

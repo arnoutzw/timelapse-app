@@ -1,0 +1,15 @@
+{
+  "name": "ring-snapshot-timelapse",
+  "version": "2.0.0",
+  "description": "Standalone Ring camera snapshot and timelapse tool — no Home Assistant required",
+  "type": "module",
+  "scripts": {
+    "snapshot": "node snapshot.mjs",
+    "setup": "node cli/setup-auth.mjs",
+    "start": "node pwa_applet/server.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ring-client-api": "^13.2.0"
+  }
+}

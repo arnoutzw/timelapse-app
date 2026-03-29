@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ring-timelapse:
+    build: .
+    container_name: ring-timelapse
+    restart: unless-stopped
+    volumes:
+      # Persistent volume for Ring refresh token + media
+      - ring-data:/data
+      - ./pwa_applet/media:/app/pwa_applet/media
+    environment:
+      RING_TOKEN_PATH: /data/ring-token.json
+      RING_CAMERA_NAME: ""
+      CAPTURE_METHOD: auto
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  ring-data:

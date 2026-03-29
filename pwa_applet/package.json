@@ -1,0 +1,14 @@
+{
+  "name": "ring-timelapse-pwa",
+  "version": "2.0.0",
+  "description": "Ring camera timelapse PWA dashboard",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
+  }
+}

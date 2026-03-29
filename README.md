@@ -1,381 +1,150 @@
-# Home Assistant Timelapse Package
+# Ring Timelapse
 
-Automated timelapse creation from Home Assistant dashboard snapshots. Capture hourly, daily, or custom-interval snapshots and automatically generate MP4 videos using FFmpeg.
-
-**Perfect for:**
-- Monitoring dashboard activity over time
-- Creating plant growth time-lapses
-- Monitoring solar generation patterns
-- Home automation visualization
-
----
+Standalone Ring camera snapshot and timelapse tool. Talks directly to Ring's API — no Home Assistant, no Chromium browser, no subscription required.
 
 ## Quick Start
 
-### Option 1: Docker (Recommended for Proxmox)
+### 1. Install dependencies
 
 ```bash
-# Setup
-cp .env.example .env
-nano .env  # Edit with your HA credentials
+npm install
+cd pwa_applet && npm install && cd ..
+```
 
-# Run
+### 2. Authenticate with Ring (one-time)
+
+```bash
+node cli/setup-auth.mjs
+```
+
+You'll be prompted for your Ring email, password, and a 2FA code. A refresh token is saved to `data/ring-token.json` and auto-rotates — you won't need to do this again.
+
+### 3. Take a snapshot
+
+```bash
+node snapshot.mjs                     # saves snapshot_<timestamp>.jpg
+node snapshot.mjs my-photo.jpg        # custom filename
+```
+
+### 4. Run the PWA dashboard
+
+```bash
+node pwa_applet/server.mjs
+# Open http://localhost:3000
+```
+
+### 5. Run a timelapse
+
+```bash
+./timelapse.sh --interval 30 --total-duration 3600 --framerate 30
+```
+
+---
+
+## Docker Deployment (Proxmox)
+
+```bash
+cp .env.example .env
+
+# First: authenticate (interactive)
+docker-compose run --rm ring-timelapse node cli/setup-auth.mjs
+
+# Then: start the dashboard
 docker-compose up -d
+
+# View logs
 docker-compose logs -f
 ```
 
-### Option 2: Direct Installation
-
-```bash
-sudo chmod +x install.sh
-sudo ./install.sh
-
-sudo nano /opt/ha-timelapse/config/.env
-sudo systemctl start ha-timelapse.timer
-```
-
-### Option 3: Manual Cron Setup
-
-```bash
-sudo chmod +x cron-setup.sh
-sudo ./cron-setup.sh
-```
-
----
-
-## Features
-
-- ✅ **Automated Snapshots** - Capture at configurable intervals
-- ✅ **Scheduled Execution** - Run daily, hourly, or on custom schedule
-- ✅ **FFmpeg Integration** - Auto-generates MP4 videos
-- ✅ **Portable** - Works on Docker, LXC, VMs, bare metal
-- ✅ **Proxmox Ready** - Optimized for Proxmox deployment
-- ✅ **Error Handling** - Comprehensive logging and retry logic
-- ✅ **Customizable** - Full control over intervals, framerate, duration
-
----
-
-## Package Contents
-
-```
-ha-timelapse/
-├── snapshot.mjs              # Core snapshot capture script
-├── timelapse.sh              # Main timelapse orchestration script
-├── install.sh                # System-level installer (requires sudo)
-├── cron-setup.sh             # Alternative cron setup
-├── Dockerfile                # Docker container definition
-├── docker-compose.yml        # Docker Compose configuration
-├── .env.example              # Configuration template
-├── README.md                 # This file
-└── DEPLOYMENT.md             # Detailed deployment guide
-```
+The Docker image is ~300MB (Node + FFmpeg only — no Chromium).
 
 ---
 
 ## Configuration
 
-### Basic Setup
+### Environment Variables
 
-1. **Copy environment template**
-   ```bash
-   cp .env.example .env
-   ```
+| Variable | Default | Description |
+|---|---|---|
+| `RING_TOKEN_PATH` | `./data/ring-token.json` | Path to Ring refresh token file |
+| `RING_CAMERA_NAME` | *(first camera)* | Camera name filter |
+| `CAPTURE_METHOD` | `auto` | `auto`, `snapshot_api`, or `live_view` |
+| `PORT` | `3000` | PWA server port |
 
-2. **Get Home Assistant Long-Lived Token**
-   - In HA: Profile → Long-lived Access Tokens → Create
-   - Copy token to `.env`
+### streams.config.json
 
-3. **Edit `.env`**
-   ```bash
-   HA_BASE=http://192.168.1.100:8123
-   HA_TOKEN=eyJhbGc...
-   CAPTURE_INTERVAL=30
-   TOTAL_DURATION=3600
-   FRAMERATE=30
-   ```
+```json
+{
+  "ring": {
+    "tokenPath": "./data/ring-token.json"
+  },
+  "streams": [
+    {
+      "id": "kweektent",
+      "name": "Kweektent",
+      "cameraName": "Indoor Cam",
+      "startupConnect": false,
+      "captureIntervalMs": 15000,
+      "captureMethod": "auto"
+    }
+  ]
+}
+```
 
-### Parameters
-
-| Parameter | Default | Unit | Example |
-|-----------|---------|------|---------|
-| `HA_BASE` | - | URL | `http://homeassistant.local:8123` |
-| `HA_TOKEN` | - | token | `eyJhbGc...` |
-| `CAPTURE_INTERVAL` | 30 | seconds | `10, 30, 60, 300` |
-| `TOTAL_DURATION` | 3600 | seconds | `1800 (30m), 3600 (1h)` |
-| `FRAMERATE` | 30 | fps | `24, 30, 60` |
+Set `cameraName` to match the name shown in your Ring app.
 
 ---
 
-## Deployment
+## Capture Methods
 
-### For Proxmox
+| Method | How it works | Subscription needed? | Speed |
+|---|---|---|---|
+| `snapshot_api` | Requests a JPEG from Ring's cloud | No* | ~1s |
+| `live_view` | Starts a SIP session, grabs one frame via FFmpeg, disconnects | No | ~3-5s |
+| `auto` | Tries snapshot API first, falls back to live view | No | Varies |
 
-**Recommended: Docker in LXC Container**
-
-```bash
-# Create Ubuntu 22.04 LXC container
-# CPU: 2 cores, RAM: 2GB, Disk: 20GB
-
-# Inside container:
-apt update && apt install -y docker.io docker-compose git
-git clone <repo> ha-timelapse
-cd ha-timelapse
-cp .env.example .env
-nano .env
-docker-compose up -d
-```
-
-**For detailed instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+\* Snapshot API may return stale images without Ring Protect on some devices. Use `live_view` if you see this.
 
 ---
 
-## Usage
+## Project Structure
 
-### Docker
-
-```bash
-# Start service
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Run manually
-docker-compose run --rm ha-timelapse
-
-# Stop
-docker-compose down
 ```
-
-### Direct Installation
-
-```bash
-# Start timer
-sudo systemctl start ha-timelapse.timer
-
-# View scheduled time
-sudo systemctl list-timers ha-timelapse.timer
-
-# View logs
-sudo journalctl -u ha-timelapse.service -f
-
-# Run manually
-sudo systemctl start ha-timelapse.service
-```
-
-### Manual Cron
-
-```bash
-# Setup cron
-sudo ./cron-setup.sh
-
-# View cron jobs
-crontab -l
-
-# Edit cron schedule
-crontab -e
-
-# View logs
-tail -f /var/log/ha-timelapse.log
+ring_snapshot/
+├── lib/
+│   ├── ring-client.mjs          # Ring auth, token persistence, camera discovery
+│   ├── snapshot-capture.mjs     # Dual-strategy capture (snapshot API + live view)
+│   └── timelapse-engine.mjs     # Node.js timelapse scheduler
+├── cli/
+│   └── setup-auth.mjs           # One-time 2FA authentication wizard
+├── pwa_applet/
+│   ├── server.mjs               # Express + WebSocket server (Ring-native)
+│   ├── streams.config.json      # Camera configuration
+│   └── public/                  # PWA frontend
+├── snapshot.mjs                 # CLI snapshot tool
+├── timelapse.sh                 # Shell-based timelapse script
+├── Dockerfile                   # Slim Docker image (Node + FFmpeg)
+└── docker-compose.yml           # Ready for Proxmox deployment
 ```
 
 ---
 
-## Scheduling Examples
+## API Endpoints
 
-### Systemd Timer
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/streams` | GET | List all streams and states |
+| `/api/streams/:id/connect` | POST | Start capturing from camera |
+| `/api/streams/:id/disconnect` | POST | Stop capturing |
+| `/api/streams/:id/restart` | POST | Reconnect |
+| `/api/streams/:id/recording/start` | POST | Start MP4 recording |
+| `/api/streams/:id/recording/stop` | POST | Stop recording |
+| `/api/streams/:id/timelapse/start` | POST | Start timelapse capture |
+| `/api/streams/:id/timelapse/stop` | POST | Stop timelapse |
+| `/api/streams/:id/frame.jpg` | GET | Latest JPEG frame |
+| `/api/streams/:id/media` | GET | List saved recordings/timelapses |
+| `/api/health` | GET | Ring auth status + camera info |
 
-Edit `/etc/systemd/system/ha-timelapse.timer`:
-
-```ini
-# Daily at 2 AM
-OnCalendar=*-*-* 02:00:00
-
-# Every 6 hours
-OnCalendar=*-*-* 00/6:00:00
-
-# Every hour
-OnCalendar=hourly
-
-# Every 30 minutes
-OnBootSec=30min
-OnUnitActiveSec=30min
-```
-
-### Cron
-
-Edit with `crontab -e`:
-
-```bash
-# Daily at 2 AM
-0 2 * * * /opt/ha-timelapse/run-timelapse.sh
-
-# Every 6 hours
-0 0,6,12,18 * * * /opt/ha-timelapse/run-timelapse.sh
-
-# Every hour
-0 * * * * /opt/ha-timelapse/run-timelapse.sh
-
-# Every 30 minutes
-*/30 * * * * /opt/ha-timelapse/run-timelapse.sh
-```
-
----
-
-## Troubleshooting
-
-### "Cannot connect to Home Assistant"
-1. Verify Home Assistant URL: `curl http://192.168.1.100:8123`
-2. Check token is valid in HA UI
-3. Verify container/system can reach HA network
-
-### "Chrome/Chromium sandbox error"
-```bash
-# For Docker: Add to Dockerfile
-RUN echo 'kernel.unprivileged_userns_clone=1' | tee /etc/sysctl.d/chromium.conf
-
-# For direct install:
-echo 'kernel.unprivileged_userns_clone=1' | sudo tee /etc/sysctl.d/chromium.conf
-sudo sysctl -p /etc/sysctl.d/chromium.conf
-```
-
-### "FFmpeg not found"
-```bash
-# Docker: Already included
-# Direct install:
-sudo apt install ffmpeg
-```
-
-### View detailed logs
-```bash
-# Docker
-docker-compose logs -f ha-timelapse
-
-# Direct install
-sudo journalctl -u ha-timelapse.service -f
-
-# Manual cron
-tail -f /var/log/ha-timelapse.log
-```
-
----
-
-## Manual Execution
-
-Test the scripts manually before scheduling:
-
-```bash
-# Docker
-docker-compose run --rm ha-timelapse
-
-# Direct install
-cd /opt/ha-timelapse
-./timelapse.sh -i 30 -t 3600 -f 30 \
-  -d /tmp/snapshots \
-  -o /tmp/timelapse.mp4
-
-# View output
-ls -lh /tmp/snapshots/
-ls -lh /tmp/timelapse.mp4
-```
-
----
-
-## Performance Tips
-
-### Optimize for Storage
-```bash
-# Use lower framerate
-FRAMERATE=24
-
-# Increase capture interval
-CAPTURE_INTERVAL=60
-
-# Reduce total duration
-TOTAL_DURATION=1800
-```
-
-### Optimize for Speed
-```bash
-# Increase framerate for smoother video
-FRAMERATE=60
-
-# Decrease capture interval for more frames
-CAPTURE_INTERVAL=10
-
-# Increase duration for longer timelapses
-TOTAL_DURATION=7200
-```
-
----
-
-## Directory Structure
-
-### Docker Volume Mounts
-```
-/data/
-├── snapshots/     # JPEG snapshots
-│   ├── snapshot_00001.jpg
-│   ├── snapshot_00002.jpg
-│   └── ...
-└── videos/        # MP4 output files
-    ├── timelapse-20240101-020000.mp4
-    └── ...
-```
-
-### Direct Installation
-```
-/var/lib/ha-timelapse/
-├── snapshots/     # Snapshot storage
-└── videos/        # Video output
-
-/opt/ha-timelapse/
-├── snapshot.mjs
-├── timelapse.sh
-├── config/
-│   └── .env
-└── node_modules/
-```
-
----
-
-## Uninstall
-
-### Docker
-```bash
-docker-compose down -v
-rm -rf /path/to/ha-timelapse
-```
-
-### Direct Installation
-```bash
-sudo systemctl disable ha-timelapse.timer
-sudo systemctl stop ha-timelapse.timer
-sudo rm /etc/systemd/system/ha-timelapse.*
-sudo rm -rf /opt/ha-timelapse
-sudo rm -rf /var/lib/ha-timelapse
-sudo systemctl daemon-reload
-```
-
-### Cron
-```bash
-crontab -e  # Remove the ha-timelapse line
-sudo rm /opt/ha-timelapse/run-timelapse.sh
-```
-
----
-
-## Support
-
-1. Check [DEPLOYMENT.md](DEPLOYMENT.md) for detailed setup instructions
-2. Review logs: `journalctl -u ha-timelapse.service -f`
-3. Test manually with `sudo systemctl start ha-timelapse.service`
-4. Verify Home Assistant is accessible and token is valid
-
----
-
-## License
-
-MIT License - Free to use and modify
+WebSocket at `/` streams real-time frames and state updates.
 
 # timelapse-app

@@ -1,0 +1,8 @@
+node_modules/
+data/
+*.jpg
+*.mp4
+.env
+pwa_applet/media/
+pwa_applet/node_modules/
+pwa_applet/recordings/

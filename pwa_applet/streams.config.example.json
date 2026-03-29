@@ -1,0 +1,16 @@
+{
+  "ring": {
+    "tokenPath": "./data/ring-token.json"
+  },
+  "streams": [
+    {
+      "id": "my-camera",
+      "name": "Garden Cam",
+      "cameraName": "Indoor Cam",
+      "notes": "Set cameraName to match the name shown in your Ring app.",
+      "startupConnect": false,
+      "captureIntervalMs": 15000,
+      "captureMethod": "auto"
+    }
+  ]
+}
